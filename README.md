@@ -4,7 +4,8 @@
 
 ## Proyecto
 
-Este proyecto consiste en analizar el mercado de las Steak House en algunos sectores de Estados Unidos, mediante la extracción de fuentes de datos de Google Maps y Yelp. 
+Este proyecto consiste en analizar el mercado de Steak House en algunos sectores de Estados Unidos, mediante la extracción de datos de las fuentes Google Maps y Yelp. 
+
 Los objetivos de negocio consisten en; 
 
 -	Analizar las tendencias del consumidor de Steak House
