@@ -1,4 +1,4 @@
-# **Analitycal Insights C.O**
+# **Analitycal Insights CO**
 #### Somos una empresa especializada en el análisis profundo de datos que ofrece asistencia para la toma de decisiones. 
 <img src="images/1695228347590.jpg" alt="Analitycal Insights C.O" width="600px" height="400px">
 
