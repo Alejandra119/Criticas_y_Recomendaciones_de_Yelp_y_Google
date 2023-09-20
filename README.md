@@ -6,11 +6,11 @@
 
 Este proyecto consiste en analizar el mercado de Steak House en algunos sectores de Estados Unidos, mediante la extracción de datos de las fuentes Google Maps y Yelp. 
 
-Los objetivos de negocio consisten en; 
+Los objetivos del proyecto son; 
 
--	Analizar las tendencias del consumidor de Steak House
--	Identificar los riesgos que causan pérdida de clientes
--	Identificar oportunidades en el negocio de las Steak House
+1) 	Estructurar una base de datos para consumo de analisis y modelamiento
+2)  Realizar un Modelo de Machine Learning de analisis de sentimientos sobre las críticas, reviews y opiniones de los usuarios
+3)  Elaborar reporte dinámico que permita analizar las tendencias del consumidor de Steakhouses, identificando riesgos y oportunidades a traves del seguimiento
   
 La solución propuesta consta de tres fases que combina un enfoque data-driven y la creación de un modelo de análisis de sentimiento NLP para abordar la creciente competencia en la industria de los restaurantes de Steak House. Al implementar este sistema, los restaurantes podrán mejorar la satisfacción del cliente, tomar decisiones basadas en datos y mantener su posición competitiva en el mercado.
 
