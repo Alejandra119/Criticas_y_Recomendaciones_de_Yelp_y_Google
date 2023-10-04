@@ -5,15 +5,9 @@ from airflow.operators.bash import BashOperator
 from datetime import timedelta
 import pandas as pd
 import re
-#from airflow.operators.http import HttpOperator
-#from airflow.providers.google.cloud.operators.storage import ReadFromGoogleDriveFile
-from airflow.providers.google.cloud.transfers.gdrive_to_local import GoogleDriveToLocalOperator
+import pyarrow.parquet as pq
 
-
-
-
-ruta_bucket = "gs://bucket-pghenry-dpt2"
-
+# Argumentos por defecto del DAG
 default_args = {
     'start_date': airflow.utils.dates.days_ago(0),
     'retries': 0,
@@ -28,143 +22,163 @@ dag = DAG(
     schedule_interval="0 0 * * *",
     max_active_runs=1,
     catchup=False,
-    dagrun_timeout=timedelta(minutes=10),
+    dagrun_timeout=timedelta(days=1),
 )
 
+# Tarea para leer todos los archivos JSON
+def read_all_json_files(input_path):
+    """Lee todos los archivos JSON en un directorio.
 
+    Args:
+        input_path (str): Ruta al directorio que contiene los archivos JSON.
 
-def remover_caracteres(text):   
-    '''
-    Esta función elimina todos los caracteres que no sean letras 
-    '''
-    
-    # Patrón de expresión regular para encontrar caracteres que no sean del alfabeto
-    patron = r'[^a-zA-Z\s]'  # Acepta letras minúsculas, letras mayúsculas y espacios en blanco
+    Returns:
+        list[dict]: Una lista de diccionarios JSON.
+    """
 
-    # Eliminar caracteres no deseados utilizando la función sub() de re (reemplaza coincidencias)
-    limpieza_text = re.sub(patron, '', text)
+    json_files = []
+    for filename in os.listdir(input_path):
+        if filename.endswith('.json'):
+            json_files.append(os.path.join(input_path, filename))
 
-    return limpieza_text
+    json_data = []
+    for json_file in json_files:
+        with open(json_file, 'r') as f:
+            json_data.append(json.load(f))
 
+    return json_data
 
+# Tarea para juntar todos los datos JSON en un solo DataFrame
+def merge_json_data(json_data):
+    """Junta todos los datos JSON en un solo DataFrame.
 
-def ETL_business(ruta, nombre_archivo):
-    # Carga el archivo en Pandas
-    archivo = f'{ruta}/crudo/{nombre_archivo}'
-    df = pd.read_parquet(archivo)
+    Args:
+        json_data (list[dict]): Una lista de diccionarios JSON.
 
+    Returns:
+        pandas.DataFrame: Un DataFrame que contiene todos los datos JSON.
+    """
 
-    # Creamos una mascara
-    mask = df['categories'].str.contains('Steakhouses', case=False)
+    df = pd.DataFrame(json_data[0])
+    for i in range(1, len(json_data)):
+        df = pd.concat([df, pd.DataFrame(json_data[i])])
 
-    # Filtramos
-    df = df.loc[mask, ['business_id', 'name', 'address', 'city', 'latitude', 
-                                   'longitude', 'stars', 'review_count', 'is_open', 'categories']]
+    return df
 
+# Tarea para procesar los datos JSON
+def process_json_data(df):
+    """Procesa los datos JSON en un DataFrame.
 
-    #Eliminar duplicados y nulos
-    df.drop_duplicates(inplace=True)
-    df.dropna(inplace=True)
+    Args:
+        df (pandas.DataFrame): Un DataFrame que contiene los datos JSON.
 
-    # Transformación
-    def reorganize_categories(x):
-        return ', '.join(sorted(x.split(', '), key=lambda s: s != 'Steakhouses'))
+    Returns:
+        pandas.DataFrame: Un DataFrame que contiene los datos JSON procesados.
+    """
 
-    # Aplicar la función a la columna 'categories'
-    df['categories'] = df['categories'].apply(reorganize_categories)
+    # Aquí puedes agregar el código para procesar los datos JSON. Por ejemplo, puedes eliminar columnas, transformar datos, etc.
 
-    # Separar las categorías en una nueva columna 'Category' y las demás en 'Subcategory'
-    df['category'] = df['categories'].str.split(', ').str[0]
-    df['subcategory'] = df['categories'].str.split(', ').str[1:].apply(', '.join)
+    return df
 
-    # Eliminar la columna original 'categories'
-    df.drop('categories', axis=1, inplace=True)
+# Tarea para escribir el DataFrame a un archivo Parquet
+def write_dataframe_to_parquet(df, output_path):
+    """Escribe un DataFrame a un archivo Parquet.
 
-    # Guardar el DataFrame procesado 
-    archivo = f'{ruta}/filtrado/business.parquet'
-    df.to_parquet(archivo, index=False)
+    Args:
+        df (pandas.DataFrame): Un DataFrame que contiene los datos.
+        output_path (str): Ruta al archivo Parquet.
+    """
 
+    df.to_parquet(output_path, index=False)
 
+def process_all_json_files(input_path):
+    """Lee todos los archivos JSON en un directorio.
 
+    Args:
+        input_path (str): Ruta al directorio que contiene los archivos JSON.
 
+    Returns:
+        list[dict]: Una lista de diccionarios JSON.
+    """
 
-def ETL_review(ruta, nombre_archivo):
+    json_files = []
+    for filename in os.listdir(input_path):
+        if filename.endswith('.json'):
+            json_files.append(os.path.join(input_path, filename))
 
+    json_data = []
+    for json_file in json_files:
+        with open(json_file, 'r') as f:
+            json_data.append(json.load(f))
 
-    archivo = f'{ruta}/filtrado/business.parquet'
-    business = pd.read_parquet(archivo, columns=['business_id'])
-    business = business['business_id']
+    return json_data
 
-
-
-    # Cargar el archivo en Pandas
-    filters = [('business_id', 'in', business)]
-    archivo = f'{ruta}/crudo/{nombre_archivo}'
-    df = pd.read_parquet(archivo, filters=filters)
-
-
-    # Filtrar x tipo de negocio
-    archivo = f'{ruta}/filtrado/business.parquet'
-    business = pd.read_parquet(archivo)
-    business = business['business_id']
-    mask = df['business_id'].isin(business) == True
-    df = df[mask]
-
-    #Eliminar duplicados y nulos
-    df.drop_duplicates(inplace=True)
-    df.dropna(inplace=True)
-
-
-    #Eliminar las columnas que no se utilizarán; "cool" y "funny"
-    df = df.drop(['cool', 'funny'], axis=1)
-
-    #Convertir a tipo de dato datetime
-    df['date'] = pd.to_datetime(df['date']) 
-    # Extraer solo la parte de la fecha
-    df['date'] = df['date'].dt.date
-
-
-    #Cambiar los tipos de datos 
-    df['stars'] = df['stars'].astype(int)
-    df['text'] = df['text'].astype(str)
-
-    # Limpiar Texto
-    df['text'] = df['text'].apply(remover_caracteres)
-
-
-    # Guardar el DataFrame procesado 
-    archivo = f'{ruta}/filtrado/review.parquet'
-    df.to_parquet(archivo, index=False)
-
-
-
-
-
-
-
-
-
-# Tarea de transformación de datos business
-transform_data_business_task = PythonOperator(
-    task_id="transform_data_business",
-    python_callable=ETL_business,
-    op_args=[ruta_bucket, "business.parquet"],    
+# Tarea para procesar todos los archivos JSON
+t1 = PythonOperator(
+    task_id='process_all_json_files',
+    python_callable=process_all_json_files,
+    op_args=['gs://bucket-pghenry-dpt2/google_sitios/'],
     dag=dag,
 )
 
-
-
-
-# Tarea de transformación de datos review
-transform_data_review_task = PythonOperator(
-    task_id="transform_data_review",
-    python_callable=ETL_review,
-    op_args=[ruta_bucket, "review_2009_12_31.parquet"],
+# Tarea para juntar todos los datos JSON en un solo DataFrame
+t2 = PythonOperator(
+    task_id='merge_json_data',
+    python_callable=merge_json_data,
+    op_args=[t1.output],
     dag=dag,
 )
 
+# Tarea para procesar los datos JSON
+t3 = PythonOperator(
+    task_id='process_json_data',
+    python_callable=process_json_data,
+    op_args=[t2.output],
+    dag=dag,
+)
 
+# Tarea para escribir el DataFrame a un archivo Parquet
+t4 = PythonOperator(
+    task_id='write_dataframe_to_parquet',
+    python_callable=write_dataframe_to_parquet,
+    op_args=[t3.output, 'gs://bucket-pghenry-dpt2/google/metadata_sitios.parquet'],
+    dag=dag,
+)
 
+# Dependencias entre tareas
+t1 >> t2 >> t3 >> t4
 
-# Tareas de dependencia
-transform_data_business_task >>  transform_data_review_task 
+# Tarea para procesar todos los archivos JSON en review_estados
+t5 = PythonOperator(
+    task_id='process_all_json_files_2',
+    python_callable=process_all_json_files,
+    op_args=['gs://bucket-pghenry-dpt2/crudo/google_estados/review_Pennsylvania/'],
+    dag=dag,
+)
+
+# Tarea para juntar todos los datos JSON en un solo DataFrame para review_estados
+t6 = PythonOperator(
+    task_id='merge_json_data_2',
+    python_callable=merge_json_data,
+    op_args=[t5.output],
+    dag=dag,
+)
+
+# Tarea para procesar los datos JSON para la nueva carpeta
+t7 = PythonOperator(
+    task_id='process_json_data_2',
+    python_callable=process_json_data,
+    op_args=[t6.output],
+    dag=dag,
+)
+
+# Tarea para escribir el DataFrame a un nuevo archivo Parquet
+t8 = PythonOperator(
+    task_id='write_dataframe_to_parquet_2',
+    python_callable=write_dataframe_to_parquet,
+    op_args=[t7.output, 'gs://bucket-pghenry-dpt2/review_estados.parquet'],
+    dag=dag,
+)
+
+# Dependencias entre tareas para la nueva carpeta
+t5 >> t6 >> t7 >> t8
