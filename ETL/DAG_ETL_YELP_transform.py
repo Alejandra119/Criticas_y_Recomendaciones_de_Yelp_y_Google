@@ -11,7 +11,6 @@ from airflow.providers.google.cloud.transfers.gdrive_to_local import GoogleDrive
 
 
 
-
 ruta_bucket = "gs://bucket-pghenry-dpt2"
 
 default_args = {
