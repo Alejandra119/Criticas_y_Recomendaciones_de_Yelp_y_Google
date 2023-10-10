@@ -3,14 +3,10 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 from datetime import timedelta
+from datetime import datetime
 import pandas as pd
 import re
 from google.cloud import bigquery
-
-#from airflow.operators.http import HttpOperator
-#from airflow.providers.google.cloud.operators.storage import ReadFromGoogleDriveFile
-from airflow.providers.google.cloud.transfers.gdrive_to_local import GoogleDriveToLocalOperator
-
 
 
 
@@ -27,7 +23,7 @@ dag = DAG(
     dag_id="etl_yelp_load",
     default_args=default_args,
     description='ETL Yelp Load',
-    schedule_interval="0 0 * * *",
+    schedule_interval= None, #"0 0 * * *",
     max_active_runs=1,
     catchup=False,
     dagrun_timeout=timedelta(minutes=10),
@@ -45,11 +41,25 @@ def YELP_to_bigquery():
     dataset.location = "us-central1"
     client.create_dataset(dataset, exists_ok=True)
 
+    # Crear tabla audit si no existe
+    schema = [
+        bigquery.SchemaField("date_time", "TIMESTAMP"),
+        bigquery.SchemaField("table_name", "STRING"),
+        bigquery.SchemaField("task_name", "STRING"),
+        bigquery.SchemaField("row_count_start", "INT64"),
+        bigquery.SchemaField("row_count_end", "INT64"),
+        bigquery.SchemaField("last_date_inserted", "DATE")
+    ]
+    table_ref = client.dataset("yelp").table("audit")
+    table = bigquery.Table(table_ref, schema=schema)
+    client.create_table(table, exists_ok=True)
+
+
+    # Crear tablas en BigQuery a partir de archivos
     tablas = ['business', 'tip', 'user', 'review', 'checkin']
     job_config = bigquery.LoadJobConfig(source_format=bigquery.SourceFormat.PARQUET,)
 
     for tabla in tablas:
-        # table_id = "project.your_dataset.your_table_name"
         table_id = f'pghenry-dpt2.yelp.{tabla}'
         uri = f"{ruta_bucket}/filtrado/{tabla}.parquet"
 
@@ -58,14 +68,12 @@ def YELP_to_bigquery():
         )  # API request.
 
         load_job.result()  # Espera que se complete el trabajo.
-
         destination_table = client.get_table(table_id)
-        print(f"{destination_table.num_rows} filas cargadas")
 
-
-
-
-
+        # Crear registro tabla auditoria
+        audit = client.get_table('pghenry-dpt2.yelp.audit')
+        row = bigquery.Row([datetime.now(), tabla, "Carga inicial", 0, destination_table.num_rows, None], [])
+        client.insert_rows(audit, [row])
 
 
 

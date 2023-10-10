@@ -8,11 +8,6 @@ import pandas as pd
 import re
 from google.cloud import bigquery
 
-#from airflow.operators.http import HttpOperator
-#from airflow.providers.google.cloud.operators.storage import ReadFromGoogleDriveFile
-#from airflow.providers.google.cloud.transfers.gdrive_to_local import GoogleDriveToLocalOperator
-
-
 
 
 ruta_bucket = "gs://bucket-pghenry-dpt2"
@@ -46,11 +41,24 @@ def GOOGLE_to_bigquery():
     dataset.location = "us-central1"
     client.create_dataset(dataset, exists_ok=True)
 
-    tablas = ['metadata_sitios']
+    # Crear tabla audit si no existe
+    schema = [
+        bigquery.SchemaField("date_time", "TIMESTAMP"),
+        bigquery.SchemaField("table_name", "STRING"),
+        bigquery.SchemaField("task_name", "STRING"),
+        bigquery.SchemaField("row_count_start", "INT64"),
+        bigquery.SchemaField("row_count_end", "INT64"),
+        bigquery.SchemaField("last_date_inserted", "DATE")
+    ]
+    table_ref = client.dataset("google").table("audit")
+    table = bigquery.Table(table_ref, schema=schema)
+    client.create_table(table, exists_ok=True)
+
+
+    tablas = ['metadata_sitios', 'review_estados']
     job_config = bigquery.LoadJobConfig(source_format=bigquery.SourceFormat.PARQUET,)
 
     for tabla in tablas:
-        # table_id = "proyecto.dataset.tabla"
         table_id = f'pghenry-dpt2.google.{tabla}'
         uri = f"{ruta_bucket}/google/{tabla}.parquet"
 
@@ -65,7 +73,7 @@ def GOOGLE_to_bigquery():
 
         # Crear registro tabla auditoria
         audit = client.get_table('pghenry-dpt2.google.audit')
-        row = bigquery.Row([datetime.now(), tabla, None, None, destination_table.num_rows], [])
+        row = bigquery.Row([datetime.now(), tabla, "Carga inicial", 0, destination_table.num_rows, None], [])
         client.insert_rows(audit, [row])
 
 
