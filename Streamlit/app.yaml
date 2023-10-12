@@ -1,0 +1,3 @@
+service: streamlit-steakhouses
+runtime: custom
+env: flex
