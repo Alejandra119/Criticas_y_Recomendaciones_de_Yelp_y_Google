@@ -1,5 +1,7 @@
-pandas
-streamlit
+pandas ==2.1.1
+streamlit-folium == 0.6.13
+streamlit-folium ==0.14.0
+numpy==1.36.0
 st-files-connection
 gcsfs
 plotly
@@ -7,4 +9,7 @@ db-dtypes
 nltk
 google-cloud-bigquery
 google.cloud
-google.auth
+google-auth==2.3.3
+streamlit>=1.13.0
+folium>=0.13
+streamlit-folium==0.15.0
