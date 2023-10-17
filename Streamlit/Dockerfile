@@ -1,5 +1,5 @@
 #Base Image to use
-FROM python:3.8.18-slim
+FROM python:3.9.18-slim
 #Expose port 8080
 EXPOSE 8080
 
