@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import googlemaps
 import pandas as pd
 
-api_key = 'AIzaSyB813HFZz-tiSLsiMRFU-nZ94vgJuqNzQY'
+api_key = ''
 
 # Inicializar el cliente de Google Maps
 gmaps = googlemaps.Client(key=api_key)
