@@ -1,6 +1,6 @@
 pandas
 streamlit
-st-files-connection
+#streamlit-files-connection
 gcsfs
 plotly
 db-dtypes
