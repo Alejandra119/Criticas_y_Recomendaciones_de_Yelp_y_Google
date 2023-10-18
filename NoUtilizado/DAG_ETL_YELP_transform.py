@@ -10,7 +10,7 @@ from airflow.providers.google.cloud.transfers.gdrive_to_local import GoogleDrive
 
 
 
-ruta_bucket = "gs://bucket-pghenry-dpt2"
+ruta_bucket = "gs://bucket-steakhouses2"
 
 default_args = {
     'start_date': airflow.utils.dates.days_ago(0),
@@ -28,6 +28,7 @@ dag = DAG(
     catchup=False,
     dagrun_timeout=timedelta(minutes=10),
 )
+
 
 
 

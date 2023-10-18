@@ -1,5 +1,45 @@
 import pandas as pd
 import re
+from google.cloud import bigquery
+from google.cloud import storage
+
+# Librerías análisis de sentimientos
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from nltk import sentiment
+from nltk import word_tokenize
+nltk.download('vader_lexicon') # Descarga vader_lexicon para el análisis de sentimientos.
+nltk.download('punkt') # Descarga punkt, un modelo de toquenización que divide el texto en palabras individuales
+
+
+
+
+
+
+
+
+def existe_dataset(nombre_dataset):
+    client = bigquery.Client()
+    try:
+        client.dataset(nombre_dataset).reload()
+        return True
+    except bigquery.NotFoundError:
+        return False   
+    
+
+
+
+def existe_archivo(bucket_name, archivo):
+    # Inicializa el cliente de GCS
+    client = storage.Client()
+
+    # Obtiene una referencia al bucket
+    bucket = client.get_bucket(bucket_name)
+
+
+    # Verifica si el archivo existe en la carpeta del bucket
+    blob = bucket.blob(archivo)
+    return blob.exists()
 
 
 def remover_caracteres(text):   
@@ -17,174 +57,62 @@ def remover_caracteres(text):
 
 
 
-def ETL_business(ruta, nombre_archivo):
-    # Carga el archivo en Pandas
-    try:
-        archivo = f'{ruta}/crudo/yelp/{nombre_archivo}'
-        df = pd.read_parquet(archivo)
-    except Exception as e:
-        print ('Error Excepción', e)
-
-    #Creamos una mascara
-    mask = df['categories'].str.contains('steakhouses',case = False) == True
-    df = df[mask]
-
-    #Definir las columnas que se usarán
-    columnas = ['business_id', 'name', 'address', 'city', 'state', 'latitude', 'longitude', 'stars', 'review_count', 'is_open', 'categories']
-    df = df[columnas]
-
-    #Eliminar duplicados y nulos
-    df.drop_duplicates(inplace=True)
-    df.dropna(inplace=True)
-
-    # Guardar el DataFrame procesado 
-    archivo = f'{ruta}/filtrado/business.parquet'
-    df.to_parquet(archivo, index=False)
 
 
+def sentimientos_Yelp (yelp_as):
+    # Convertir las estrellas en score
+    def to_sentiment(rating):
+        
+        rating = int(rating)
+        
+        # Convert to class
+        if rating <= 2:
+            return 0
+        elif rating == 3:
+            return 1
+        else:
+            return 2
 
+    # Apply to the dataset 
+    yelp_as['sentiment'] = yelp_as.stars.apply(to_sentiment)
 
+    # Función para clasificar los textos
+    def classify_text(text):
+        if 'food' in text.lower():
+            return 'comida'
+        elif 'service' in text.lower():
+            return 'servicio'
+        elif 'ambience' in text.lower():
+            return 'ambiente'
+        return 'otro'
 
-def ETL_tip(ruta, nombre_archivo):
-    # Cargar el archivo en Pandas
-    archivo = f'{ruta}/crudo/yelp/{nombre_archivo}'
-    df = pd.read_parquet(archivo)
-
-    # Filtrar x tipo de negocio
-    archivo = f'{ruta}/filtrado/business.parquet'
-    business = pd.read_parquet(archivo)
-    business = business['business_id']
-    mask = df['business_id'].isin(business) == True
-    df = df[mask]
-
-    # Abro el contenido con pandas
-    df.drop(columns='compliment_count', inplace=True)
-
-    #Eliminar duplicados y nulos
-    df.drop_duplicates(inplace=True)
-    df.dropna(inplace=True)
-
-
-    # Guardar el DataFrame procesado 
-    archivo = f'{ruta}/filtrado/tip.parquet'
-    df.to_parquet(archivo, index=False)
-
-
-def ETL_review(ruta, nombre_archivo):
-
-
-    archivo = f'{ruta}/filtrado/business.parquet'
-    business = pd.read_parquet(archivo, columns=['business_id'])
-    business = business['business_id']
+    # Aplica la función a la columna 'text' y crea una nueva columna 'temas'
+    yelp_as['temas'] = yelp_as['text'].apply(classify_text)
 
 
 
-    # Cargar el archivo en Pandas
-    filters = [('business_id', 'in', business)]
-    archivo = f'{ruta}/crudo/yelp/{nombre_archivo}'
-    df = pd.read_parquet(archivo, filters=filters)
+    analizador = SentimentIntensityAnalyzer()
+    def Puntaje_Sentimiento(text):
+        tokens = word_tokenize(text)  # Tokenizar el texto
+        scores = analizador.polarity_scores(text)  # Obtener los puntajes de sentimiento
+        return scores['compound']  # Retornar el puntaje compuesto
+
+    yelp_as['score_sentimientos'] = yelp_as['text'].apply(Puntaje_Sentimiento)
+
+    yelp_as['categorizacion'] = 0  # Inicializamos con 0 por defecto
+
+    # Aplicamos las condiciones para actualizar los valores en la nueva columna
+    yelp_as.loc[(yelp_as['score_sentimientos'] > -1) & (yelp_as['score_sentimientos'] < 0), 'categorizacion'] = 0
+    yelp_as.loc[yelp_as['score_sentimientos'] == 0, 'categorizacion'] = 1
+    yelp_as.loc[(yelp_as['score_sentimientos'] >= 0.1) & (yelp_as['score_sentimientos'] <= 1), 'categorizacion'] = 2
 
 
-    # Filtrar x tipo de negocio
-    archivo = f'{ruta}/filtrado/business.parquet'
-    business = pd.read_parquet(archivo)
-    business = business['business_id']
-    mask = df['business_id'].isin(business) == True
-    df = df[mask]
-
-    #Eliminar duplicados y nulos
-    df.drop_duplicates(inplace=True)
-    df.dropna(inplace=True)
-
-
-    #Eliminar las columnas que no se utilizarán; "cool" y "funny"
-    df = df.drop(['cool', 'funny'], axis=1)
-
-    #Convertir a tipo de dato datetime
-    df['date'] = pd.to_datetime(df['date']) 
-    # Extraer solo la parte de la fecha
-    df['date'] = df['date'].dt.date
-
-
-    #Cambiar los tipos de datos 
-    df['stars'] = df['stars'].astype(int)
-    df['text'] = df['text'].astype(str)
-
-    # Limpiar Texto
-    df['text'] = df['text'].apply(remover_caracteres)
-
-
-    # Guardar el DataFrame procesado 
-    archivo = f'{ruta}/filtrado/review.parquet'
-    df.to_parquet(archivo, index=False)
+    # Supongamos que tienes un DataFrame llamado 'yelp_as'
+    yelp_as['nuevos_scores'] = yelp_as['score_sentimientos'] + 1
 
 
 
-
-def ETL_checkin(ruta, nombre_archivo):
-
-    # Cargar el archivo en Pandas
-    archivo = f'{ruta}/crudo/yelp/{nombre_archivo}'
-    df = pd.read_parquet(archivo)
-
-    # Filtrar x tipo de negocio
-    archivo = f'{ruta}/filtrado/business.parquet'
-    business = pd.read_parquet(archivo)
-    business = business['business_id']
-    mask = df['business_id'].isin(business) == True
-    df = df[mask]
-
-    # Limpiar los datos de checkin.
-    df.dropna(inplace=True)
-    df.drop_duplicates(inplace=True)
-
-    # Dividir las fechas en una columna por comas.
-    df['fechas'] = df['date'].str.split(',')
-
-    # Duplicar las filas para cada fecha con su respectivo ID.
-    df = df.explode('fechas').reset_index(drop=True)
-
-    # Eliminar la columna original.
-    df.drop('date', axis=1, inplace=True)
-
-    # Reiniciar los índices.
-    df.reset_index(drop=True, inplace=True)
-
-
-    # Guardar el DataFrame procesado 
-    archivo = f'{ruta}/filtrado/checkin.parquet'
-    df.to_parquet(archivo, index=False)
-
-
-
-def ETL_user(ruta, nombre_archivo):
- 
-    # Cargar el archivo en Pandas
-    archivo = f'{ruta}/crudo/yelp/{nombre_archivo}'
-    df = pd.read_parquet(archivo)
-
-
-    # Filtramos
-    columnas = ['user_id', 'review_count', 'yelping_since', 'average_stars']
-    df = df[columnas]
-
-    # Limpiar los datos
-    df.dropna(inplace=True)
-    df.drop_duplicates(inplace=True)
-
-    # Transformación
-    try:
-        # Cambio de formato fecha
-        df['yelping_since'] = pd.to_datetime(df['yelping_since'], format='%Y-%m-%d')
-    except Exception as e:
-        print(f"Error al convertir la columna 'yelping_since' a formato de fecha: {e}")
-
-    # Guardar el DataFrame procesado 
-    archivo = f'{ruta}/filtrado/user.parquet'
-    df.to_parquet(archivo, index=False)
-
-
-
+    return yelp_as
 
 
 

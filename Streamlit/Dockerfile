@@ -1,5 +1,5 @@
 #Base Image to use
-FROM python:3.9.18-slim
+FROM python:3.8.18-slim
 #Expose port 8080
 EXPOSE 8080
 
@@ -16,4 +16,4 @@ COPY . /app
 WORKDIR /app
 
 #Run the application on port 8080
-ENTRYPOINT ["streamlit", "run", "app.py", "--server.port=8080", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit2", "run", "app.py", "--server.port=8080", "--server.address=0.0.0.0"]
