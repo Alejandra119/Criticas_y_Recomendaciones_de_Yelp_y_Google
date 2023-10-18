@@ -1,0 +1,10 @@
+pandas
+streamlit
+#streamlit-files-connection
+gcsfs
+plotly
+db-dtypes
+nltk
+google-cloud-bigquery
+google.cloud
+google.auth
