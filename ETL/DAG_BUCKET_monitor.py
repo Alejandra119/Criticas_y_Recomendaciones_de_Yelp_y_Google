@@ -1,12 +1,14 @@
 from airflow import DAG
 from airflow.providers.google.cloud.operators.gcs import GCSListObjectsOperator
-from airflow.operators.trigger_dag_run_operator import TriggerDagRunOperator
-
-
-
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 import datetime
+from DAG_ETL_YELP_transform import *
+
+
+ruta_bucket = "gs://bucket-steakhouses2"
+
 dag = DAG(
-    dag_id="check_gcs_objects",
+    dag_id="bucket_monitor",
     schedule_interval=None,
     start_date=datetime.datetime.now(),
 )
@@ -14,31 +16,22 @@ dag = DAG(
 # Monitorear creación en bucket
 list_gcs_objects_task = GCSListObjectsOperator(
     task_id="list_gcs_objects",
-    bucket="bucket-pghenry-dpt2",
-    prefix="crudo",
+    bucket=ruta_bucket,
+    prefix="crudo/yelp",
     delimiter="/",
     dag=dag,
 )
 
 
-# Disparar el DAG de otro archivo
-task = TriggerDagRunOperator(
-    task_id='trigger_dag',
-    trigger_dag_id='DAG_ETL_YELP_transform.py',
-    trigger_dag_name='etl_yelp_transform',
+# Disparar el DAG_YELP_FILES
+trigger_yelp = TriggerDagRunOperator(
+    task_id='trigger_yelp',
+    trigger_dag_id='DAG_YELP_FILES.py',
+    trigger_dag_name='dag_yelp_files',
     dag=dag
 )
 
 
 
+list_gcs_objects_task >> trigger_yelp
 
-
-
-
-
-
-
-
-
-
-list_gcs_objects_task >> print_task
