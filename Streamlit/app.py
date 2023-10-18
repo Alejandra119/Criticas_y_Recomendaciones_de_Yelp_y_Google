@@ -6,8 +6,11 @@ import gcsfs
 from functions import *
 
 st.set_page_config(page_icon="📊", page_title="Clasificación de reseñas", layout="wide")
-st.image("https://github.com/Alejandra119/Criticas_y_Recomendaciones_de_Yelp_y_Google/raw/main/images/1695228347590.jpg", width=200)
-st.title("Clasificación de reseñas a partir de la API de Yelp")
+st.markdown('<h1 style="color: #20639B;text-align: center;">ANALYTICAL INSIGHTS CO.</h1>', unsafe_allow_html=True)
+st.markdown('<h2 style="color: #173F5F; text-align: center;">Análisis de Sentimientos </h2>', unsafe_allow_html=True)
+texto = "Se muestra la clasificación del Análisis de Sentientos de las reseñas de los consumidores de Steakhouses de manera incremental extraidos de la API de YELP"
+st.markdown(texto)
+
 c29, c30, c31 = st.columns([1, 6, 1]) # 3 columnas: 10%, 60%, 10%
 
 
